@@ -9,8 +9,8 @@ structure or the other.  This plugin was originally written to help with the
 manual validation step of a protein design project, but is quite general and 
 should be useful in many other contexts as well.
 
-Installation
-============
+Installation and Usage
+----------------------
 Start by downloading the `wt_vs_mut.py` file somewhere on your computer.  The 
 entire plugin is contained in this file to make installation easier.  Then, in 
 pymol, open the two structures you want to compare.  I'll assume one is called 
