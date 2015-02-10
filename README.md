@@ -24,7 +24,7 @@ plugin, relative to wherever pymol is running.  The first command installs the
 plugin.  You'll have to type it every time you run pymol unless you put it in 
 your `~/.pymolrc` file.  The second command starts the plugin.  Once the plugin 
 is started, it will zoom in on the first difference between the two structures 
-and show all the sidechains within a few angstroms.  Press <Ctrl-Space> and it 
+and show all the sidechains within a few angstroms.  Press [Ctrl-Space] and it 
 will zoom to the next difference and show the same thing.
 
 Note that this plugin requires at least version 1.7 of pymol.  Older versions 
