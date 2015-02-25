@@ -463,7 +463,7 @@ class WildtypeVsMutant (Wizard):
         self.aligned_resis = [], []
         self.neighbor_radius = 4
         self.zoom_padding = 2
-        self.highlight_color = 'yellow'
+        self.show_polar_h = False
         self.active_prompt = ''
         self.original_view = cmd.get_view()
         self.wildtype_obj = ''
@@ -563,11 +563,11 @@ class WildtypeVsMutant (Wizard):
         self.zoom_padding = padding
         self.redraw()
 
-    def set_highlight_color(self, color):
+    def set_show_polar_h(self, option):
         """
-        Change the color used to highlight the mutated residue.
+        Change whether or not polar hydrogens are displayed.
         """
-        self.highlight_color = color
+        self.show_polar_h = option
         self.redraw()
 
     def get_next_mutation(self):
@@ -627,7 +627,7 @@ class WildtypeVsMutant (Wizard):
             [2, 'View next mutation', 'cmd.get_wizard().cycle()'],
             [3, 'Neighbor radius: {0:.1f}A'.format(self.neighbor_radius), 'radius'],
             [3, 'Zoom padding: {0:.1f}A'.format(self.zoom_padding), 'padding'],
-            [3, 'Highlight color: {}'.format(self.highlight_color), 'color'],
+            [3, 'Polar hydrogens: {}'.format('show' if self.show_polar_h else 'hide'), 'hydrogen'],
         ]
 
         for muti in self.mutations:
@@ -643,7 +643,9 @@ class WildtypeVsMutant (Wizard):
         menus = {
             'radius': [[2, 'Neighbor Radius', '']],
             'padding': [[2, 'Zoom Padding', '']],
-            'color': [[2, 'Highlight Color', '']],
+            'wt_hilite': [[2, 'Highlight Color', '']],
+            'mut_hilite': [[2, 'Highlight Color', '']],
+            'hydrogen': [[2, 'Polar Hydrogens', '']],
         }
 
         # Define the neighbor radius menu.
@@ -658,12 +660,11 @@ class WildtypeVsMutant (Wizard):
                 1, '{0}A'.format(padding),
                 'cmd.get_wizard().set_zoom_padding({})'.format(padding)]]
 
-        # Define the highlight color menu.
-        colors = 'red', 'green', 'blue', 'yellow', 'magenta', 'cyan', 'orange'
-        for color in colors:
-            menus['color'] += [[
-                1, color,
-                'cmd.get_wizard().set_highlight_color("{}")'.format(color)]]
+        # Define the polar hydrogen menu.
+        toggled_option = not self.show_polar_h
+        menus['hydrogen'] += [[
+            1, 'show' if toggled_option else 'hide',
+            'cmd.get_wizard().set_show_polar_h({})'.format(toggled_option)]]
 
         # Return the right menu.
         return menus[tag]
@@ -737,17 +738,36 @@ class WildtypeVsMutant (Wizard):
         mut_resi, mut_chain = self.aligned_resis[1][self.active_mutation]
         mut_sele = 'none' if mut_resi is None else \
                   'resi {} and chain {}'.format(mut_resi, mut_chain)
-        env = 'byres {{}} within {} of (({} and {}) or ({} and {}))'.format(
-                self.neighbor_radius, wt_obj, wt_sele, mut_obj, mut_sele)
+        h_sele = (
+                '(elem h and (neighbor elem c))' if self.show_polar_h else
+                '(elem h)')
+        env_sele = (
+                '(byres {{}} within {self.neighbor_radius} of '
+                '(({wt_obj} and {wt_sele}) or ({mut_obj} and {mut_sele}))) '
+                'and not {h_sele}'.format(**locals()))
+        
+        stored.wt_hilite, stored.mut_hilite = 'white', 'yellow'
+        if does_sele_exist('wt_hilite'):
+            cmd.iterate('wt_hilite', 'stored.wt_hilite = color')
+        if does_sele_exist('mut_hilite'):
+            cmd.iterate('mut_hilite', 'stored.mut_hilite = color')
 
         intial_view = cmd.get_view()
         cmd.delete('wt_env')
         cmd.delete('mut_env')
-        cmd.create('wt_env', env.format(wt_obj))
-        cmd.create('mut_env', env.format(mut_obj))
+        cmd.create('wt_env', env_sele.format(wt_obj))
+        cmd.create('mut_env', env_sele.format(mut_obj))
         cmd.delete('mut_hbonds')
         cmd.dist('mut_hbonds', 'mut_env', 'mut_env', mode=2)
-        cmd.color(self.highlight_color, 'mut_env and {} and symbol c'.format(mut_sele))
+        cmd.delete('wt_hilite')
+        cmd.delete('mut_hilite')
+        cmd.select('wt_hilite', 'wt_env and {wt_sele} and symbol c'.format(**locals()))
+        cmd.select('mut_hilite', 'mut_env and {mut_sele} and symbol c'.format(**locals()))
+        cmd.deselect()
+        if stored.wt_hilite != 'none':
+            cmd.color(stored.wt_hilite, 'wt_hilite')
+        if stored.mut_hilite != 'none':
+            cmd.color(stored.mut_hilite, 'mut_hilite')
         cmd.show_as('sticks', 'wt_env')
         cmd.show_as('sticks', 'mut_env')
         cmd.set_view(intial_view)
@@ -869,16 +889,25 @@ def find_mutations(alignment):
             if alignment[0][i] != alignment[1][i]
     ]
 
+def does_sele_exist(sele):
+    from types import ListType
+    session = cmd.get_session()
+    for i in session["names"]:
+        if type(i) is ListType:
+            if sele == i[0]:
+                return True
+    return False
 
-# Add "wt_vs_mut" as pymol command (fold)
+
+## Add "wt_vs_mut" as pymol command
 cmd.extend('wt_vs_mut', wt_vs_mut)
 cmd.auto_arg[0]['wt_vs_mut'] = cmd.auto_arg[0]['zoom']
 cmd.auto_arg[1]['wt_vs_mut'] = cmd.auto_arg[0]['zoom']
 
-# Trick to get "wizard wt_vs_mut" working (fold)
+## Trick to get "wizard wt_vs_mut" working
 sys.modules['pymol.wizard.wt_vs_mut'] = sys.modules[__name__]
 
-# Add item to plugin menu (fold)
+## Add item to plugin menu
 try:
     from pymol.plugins import addmenuitem
     def __init_plugin__(self): # (no fold)
