@@ -463,6 +463,8 @@ class WildtypeVsMutant (Wizard):
         self.aligned_resis = [], []
         self.neighbor_radius = 4
         self.zoom_padding = 2
+        self.wildtype_hilite = 'white'
+        self.mutant_hilite = 'yellow'
         self.show_polar_h = False
         self.active_prompt = ''
         self.original_view = cmd.get_view()
@@ -563,6 +565,20 @@ class WildtypeVsMutant (Wizard):
         self.zoom_padding = padding
         self.redraw()
 
+    def set_wildtype_hilite(self, color):
+        """
+        Change the color used to highlight the wildtype residue.
+        """
+        self.wildtype_hilite = color
+        self.redraw()
+
+    def set_mutant_hilite(self, color):
+        """
+        Change the color used to highlight the mutant residue.
+        """
+        self.mutant_hilite = color
+        self.redraw()
+
     def set_show_polar_h(self, option):
         """
         Change whether or not polar hydrogens are displayed.
@@ -625,6 +641,8 @@ class WildtypeVsMutant (Wizard):
         buttons = [
             [1, 'Wildtype vs Mutant Wizard', ''],
             [2, 'View next mutation', 'cmd.get_wizard().cycle()'],
+            [3, 'Wildtype highlight: {}'.format(self.wildtype_hilite), 'wt_hilite'],
+            [3, 'Mutant highlight: {}'.format(self.mutant_hilite), 'mut_hilite'],
             [3, 'Neighbor radius: {0:.1f}A'.format(self.neighbor_radius), 'radius'],
             [3, 'Zoom padding: {0:.1f}A'.format(self.zoom_padding), 'padding'],
             [3, 'Polar hydrogens: {}'.format('show' if self.show_polar_h else 'hide'), 'hydrogen'],
@@ -641,12 +659,32 @@ class WildtypeVsMutant (Wizard):
 
     def get_menu(self, tag):
         menus = {
-            'radius': [[2, 'Neighbor Radius', '']],
-            'padding': [[2, 'Zoom Padding', '']],
             'wt_hilite': [[2, 'Highlight Color', '']],
             'mut_hilite': [[2, 'Highlight Color', '']],
+            'radius': [[2, 'Neighbor Radius', '']],
+            'padding': [[2, 'Zoom Padding', '']],
             'hydrogen': [[2, 'Polar Hydrogens', '']],
         }
+
+        # Define the highlight color menu.
+        colors = (
+                '\\900red',
+                '\\090green',
+                '\\009blue',
+                '\\990yellow',
+                '\\909magenta',
+                '\\099cyan',
+                '\\950orange',
+                '\\999white',
+                '\\999none',
+        )
+        for color in colors:
+            menus['wt_hilite'] += [[
+                1, color,
+                'cmd.get_wizard().set_wildtype_hilite("{}")'.format(color[4:])]]
+            menus['mut_hilite'] += [[
+                1, color,
+                'cmd.get_wizard().set_mutant_hilite("{}")'.format(color[4:])]]
 
         # Define the neighbor radius menu.
         for radius in range(1, 11):
@@ -746,12 +784,6 @@ class WildtypeVsMutant (Wizard):
                 '(({wt_obj} and {wt_sele}) or ({mut_obj} and {mut_sele}))) '
                 'and not {h_sele}'.format(**locals()))
         
-        stored.wt_hilite, stored.mut_hilite = 'white', 'yellow'
-        if does_sele_exist('wt_hilite'):
-            cmd.iterate('wt_hilite', 'stored.wt_hilite = color')
-        if does_sele_exist('mut_hilite'):
-            cmd.iterate('mut_hilite', 'stored.mut_hilite = color')
-
         intial_view = cmd.get_view()
         cmd.delete('wt_env')
         cmd.delete('mut_env')
@@ -759,15 +791,10 @@ class WildtypeVsMutant (Wizard):
         cmd.create('mut_env', env_sele.format(mut_obj))
         cmd.delete('mut_hbonds')
         cmd.dist('mut_hbonds', 'mut_env', 'mut_env', mode=2)
-        cmd.delete('wt_hilite')
-        cmd.delete('mut_hilite')
-        cmd.select('wt_hilite', 'wt_env and {wt_sele} and symbol c'.format(**locals()))
-        cmd.select('mut_hilite', 'mut_env and {mut_sele} and symbol c'.format(**locals()))
-        cmd.deselect()
-        if stored.wt_hilite != 'none':
-            cmd.color(stored.wt_hilite, 'wt_hilite')
-        if stored.mut_hilite != 'none':
-            cmd.color(stored.mut_hilite, 'mut_hilite')
+        if self.wildtype_hilite != 'none':
+            cmd.color(self.wildtype_hilite, 'wt_env and {wt_sele} and symbol c'.format(**locals()))
+        if self.mutant_hilite != 'none':
+            cmd.color(self.mutant_hilite, 'mut_env and {mut_sele} and symbol c'.format(**locals()))
         cmd.show_as('sticks', 'wt_env')
         cmd.show_as('sticks', 'mut_env')
         cmd.set_view(intial_view)
