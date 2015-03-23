@@ -462,7 +462,7 @@ class WildtypeVsMutant (Wizard):
         self.aligned_seqs = '', ''
         self.aligned_resis = [], []
         self.neighbor_radius = 4
-        self.zoom_padding = 2
+        self.zoom_padding = 5
         self.wildtype_hilite = 'white'
         self.mutant_hilite = 'yellow'
         self.show_polar_h = False
