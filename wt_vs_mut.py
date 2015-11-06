@@ -456,7 +456,7 @@ class WildtypeVsMutant (Wizard):
     view each difference one at a time.
     """
 
-    def __init__(self, wildtype_obj=None, mutant_obj=None):
+    def __init__(self, wildtype_obj=None, mutant_obj=None, focus_sele=None):
         self.mutations = []
         self.active_mutation = None
         self.aligned_seqs = '', ''
@@ -469,12 +469,12 @@ class WildtypeVsMutant (Wizard):
         self.active_prompt = ''
         self.original_view = cmd.get_view()
         self.wildtype_obj = ''
-        self.wildtype_form = ''
         self.mutant_obj = ''
-        self.mutant_form = ''
+        self.focus_sele = ''
 
         self.set_wildtype_object(wildtype_obj)
         self.set_mutant_object(mutant_obj)
+        self.set_focus_sele(focus_sele)
 
     def set_wildtype_object(self, wildtype_obj):
         self.wildtype_obj = wildtype_obj
@@ -486,6 +486,11 @@ class WildtypeVsMutant (Wizard):
         self.active_prompt = ''; self.redraw()
         self.update_mutation_list()
 
+    def set_focus_sele(self, focus_sele):
+        self.focus_sele = focus_sele
+        self.active_prompt = ''; self.redraw()
+        self.update_mutation_list()
+
     def update_mutation_list(self):
         """
         Find sequence differences between the wildtype and mutant structures to 
@@ -494,16 +499,23 @@ class WildtypeVsMutant (Wizard):
         being compared.
         """
 
-        if not self.wildtype_obj or not self.mutant_obj:
+        if not self.wildtype_obj or not self.mutant_obj or not self.focus_sele:
             return
 
         # unaligned_seqmaps: A tuple of two ordered dictionaries mapping 
         # (residue id, chain id) pairs to one-letter residue names.  These two 
         # mappings encode the sequences on the wildtype and mutant objects.
 
+        if self.focus_sele is not None:
+            wildtype_sele = '({}) and ({})'.format(self.wildtype_obj, self.focus_sele)
+            mutant_sele = '({}) and ({})'.format(self.mutant_obj, self.focus_sele)
+        else:
+            wildtype_sele = self.wildtype_obj
+            mutant_sele = self.mutant_obj
+
         unaligned_seqmaps = (
-                get_sequence(self.wildtype_obj),
-                get_sequence(self.mutant_obj),
+                get_sequence(wildtype_sele),
+                get_sequence(mutant_sele),
         )
 
         # unaligned_seqs: A tuple of two strings representing the sequences of 
@@ -812,11 +824,11 @@ class WildtypeVsMutant (Wizard):
 
 
 
-def wt_vs_mut(mutant_obj=None, wildtype_obj=None):
+def wt_vs_mut(mutant_obj=None, wildtype_obj=None, focus_sele=None):
     """
     Provide a convenient way to launch the wizard from the command-line.
     """
-    wizard = WildtypeVsMutant(mutant_obj, wildtype_obj)
+    wizard = WildtypeVsMutant(mutant_obj, wildtype_obj, focus_sele)
     cmd.set_wizard(wizard)
 
 def get_sequence(selection):
