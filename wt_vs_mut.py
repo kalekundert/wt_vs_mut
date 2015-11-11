@@ -456,7 +456,7 @@ class WildtypeVsMutant (Wizard):
     view each difference one at a time.
     """
 
-    def __init__(self, wildtype_obj=None, mutant_obj=None, focus_sele=None):
+    def __init__(self, wildtype_obj='', mutant_obj='', focus_sele=''):
         self.mutations = []
         self.active_mutation = None
         self.aligned_seqs = '', ''
@@ -472,9 +472,9 @@ class WildtypeVsMutant (Wizard):
         self.mutant_obj = ''
         self.focus_sele = ''
 
+        self.set_focus_sele(focus_sele)
         self.set_wildtype_object(wildtype_obj)
         self.set_mutant_object(mutant_obj)
-        self.set_focus_sele(focus_sele)
 
     def set_wildtype_object(self, wildtype_obj):
         self.wildtype_obj = wildtype_obj
@@ -499,24 +499,26 @@ class WildtypeVsMutant (Wizard):
         being compared.
         """
 
-        if not self.wildtype_obj or not self.mutant_obj or not self.focus_sele:
+        if not self.wildtype_obj or not self.mutant_obj:
             return
 
         # unaligned_seqmaps: A tuple of two ordered dictionaries mapping 
         # (residue id, chain id) pairs to one-letter residue names.  These two 
         # mappings encode the sequences on the wildtype and mutant objects.
 
-        if self.focus_sele is not None:
-            wildtype_sele = '({}) and ({})'.format(self.wildtype_obj, self.focus_sele)
-            mutant_sele = '({}) and ({})'.format(self.mutant_obj, self.focus_sele)
-        else:
-            wildtype_sele = self.wildtype_obj
-            mutant_sele = self.mutant_obj
-
         unaligned_seqmaps = (
-                get_sequence(wildtype_sele),
-                get_sequence(mutant_sele),
+                get_sequence(self.wildtype_obj),
+                get_sequence(self.mutant_obj),
         )
+
+        # focus_resis: A list of all the (residue id, chain id) pairs for all 
+        # the residues the user is interested in, or undefined if the user is 
+        # interested in every residue.  If defined, the list will also contain 
+        # None tacked onto the end, indicating that the user is also interested 
+        # in gaps.  Mutations not in this list should not be shown.
+
+        if self.focus_sele:
+            focus_resis = get_sequence(self.focus_sele).keys() + [None]
 
         # unaligned_seqs: A tuple of two strings representing the sequences of 
         # the wildtype and mutant objects.  The mapping to residue and chain 
@@ -550,7 +552,17 @@ class WildtypeVsMutant (Wizard):
         # the two aligned sequences, excluding terminal gaps.  These indices 
         # can be used with both self.aligned_seqs and self.aligned_resis.
 
-        self.mutations = find_mutations(self.aligned_seqs)
+        def in_focus_sele(i):
+            if not self.focus_sele:
+                return True
+            else:
+                return (self.aligned_resis[0][i] in focus_resis or
+                        self.aligned_resis[1][i] in focus_resis)
+
+        self.mutations = [
+                i for i in find_mutations(self.aligned_seqs)
+                if in_focus_sele(i)
+        ]
 
         # Automatically zoom in on the first mutation.
 
@@ -837,7 +849,7 @@ def get_sequence(selection):
     """
     sequence = collections.OrderedDict()
     str_to_int = int; aa_table = amino_acids
-    ca_selection = '(name ca) and byres {}'.format(selection)
+    ca_selection = '(name ca) and byres ({})'.format(selection)
     sequence_builder = 'sequence[str_to_int(resi), chain] = aa_table[resn]'
     cmd.iterate(ca_selection, sequence_builder, space=locals())
     return sequence
