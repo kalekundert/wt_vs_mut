@@ -4,6 +4,7 @@
 import sys, re, collections
 from pymol import cmd
 from pymol.wizard import Wizard
+from pprint import pprint
 
 amino_acids = {
         'ALA': 'A', 
@@ -849,9 +850,9 @@ def get_sequence(selection):
     """
     sequence = collections.OrderedDict()
     str_to_int = int; aa_table = amino_acids
-    ca_selection = '(name ca) and byres ({})'.format(selection)
-    sequence_builder = 'sequence[str_to_int(resi), chain] = aa_table[resn]'
-    cmd.iterate(ca_selection, sequence_builder, space=locals())
+    sequence_builder = \
+            'sequence[str_to_int(resi), chain] = aa_table.get(resn, "")'
+    cmd.iterate(selection, sequence_builder, space=locals())
     return sequence
 
 def get_alignment(seq1, seq2, score_matrix=blosum_62, gap_penalty=-20):
