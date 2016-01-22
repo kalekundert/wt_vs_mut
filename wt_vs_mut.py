@@ -718,7 +718,7 @@ class WildtypeVsMutant (Wizard):
                 'cmd.get_wizard().set_neighbor_radius({})'.format(radius)]]
 
         # Define the zoom padding menu.
-        for padding in range(0, 11):
+        for padding in range(15 + 1):
             menus['padding'] += [[
                 1, '{0}A'.format(padding),
                 'cmd.get_wizard().set_zoom_padding({})'.format(padding)]]
@@ -802,13 +802,13 @@ class WildtypeVsMutant (Wizard):
         mut_sele = 'none' if mut_resi is None else \
                   'resi {} and chain {}'.format(mut_resi, mut_chain)
         h_sele = (
-                '(elem h and (neighbor elem c))' if self.show_polar_h else
-                '(elem h)')
+                '(elem H and (neighbor elem C))' if self.show_polar_h else
+                '(elem H)')
         env_sele = (
                 '(byres {{}} within {self.neighbor_radius} of '
                 '(({wt_obj} and {wt_sele}) or ({mut_obj} and {mut_sele}))) '
                 'and not {h_sele}'.format(**locals()))
-        
+
         intial_view = cmd.get_view()
         cmd.delete('wt_env')
         cmd.delete('mut_env')
@@ -817,9 +817,9 @@ class WildtypeVsMutant (Wizard):
         cmd.delete('mut_hbonds')
         cmd.dist('mut_hbonds', 'mut_env', 'mut_env', mode=2)
         if self.wildtype_hilite != 'none':
-            cmd.color(self.wildtype_hilite, 'wt_env and {wt_sele} and symbol c'.format(**locals()))
+            cmd.color(self.wildtype_hilite, 'wt_env and {wt_sele} and elem C'.format(**locals()))
         if self.mutant_hilite != 'none':
-            cmd.color(self.mutant_hilite, 'mut_env and {mut_sele} and symbol c'.format(**locals()))
+            cmd.color(self.mutant_hilite, 'mut_env and {mut_sele} and elem C'.format(**locals()))
         cmd.show_as('sticks', 'wt_env')
         cmd.show_as('sticks', 'mut_env')
         cmd.set_view(intial_view)
