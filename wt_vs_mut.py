@@ -460,6 +460,7 @@ class WildtypeVsMutant (Wizard):
 
     def __init__(self, wildtype_obj='', mutant_obj='', focus_sele=''):
         self.mutations = []
+        self.active_environments = []
         self.active_mutation = None
         self.aligned_seqs = '', ''
         self.aligned_resis = [], []
@@ -794,6 +795,8 @@ class WildtypeVsMutant (Wizard):
         cmd.refresh_wizard()
         if not self.active_mutation: return
 
+        print self.get_mutation_name( self.active_mutation )
+
         wt_obj = self.wildtype_obj
         wt_resi, wt_chain = self.aligned_resis[0][self.active_mutation]
         wt_sele = 'none' if wt_resi is None else \
@@ -811,12 +814,10 @@ class WildtypeVsMutant (Wizard):
                 'and not {h_sele}'.format(**locals()))
 
         intial_view = cmd.get_view()
-        cmd.delete('wt_env')
-        cmd.delete('mut_env')
-        cmd.create('wt_env', env_sele.format(wt_obj))
-        cmd.create('mut_env', env_sele.format(mut_obj))
-        cmd.delete('mut_hbonds')
-        cmd.dist('mut_hbonds', 'mut_env', 'mut_env', mode=2)
+        self.delete_active_environments()
+        self.create_environment('wt_env', env_sele.format(wt_obj))
+        self.create_environment('mut_env', env_sele.format(mut_obj))
+        self.draw_self_self_hbonds('mut_env')
         if self.wildtype_hilite != 'none':
             cmd.color(self.wildtype_hilite, 'wt_env and {wt_sele} and elem C'.format(**locals()))
         if self.mutant_hilite != 'none':
@@ -826,16 +827,40 @@ class WildtypeVsMutant (Wizard):
         cmd.set_view(intial_view)
         cmd.zoom('wt_env', buffer=self.zoom_padding, animate=-1)
 
+    def create_environment(self, env_name, env):
+        """
+        Create a new environment in PyMOL, and keep track of it in member variable.
+        """
+        cmd.create(env_name, env)
+        self.active_environments.append(env_name)
+
+    def draw_self_self_hbonds(self, env_name):
+        hbonds_env_name = env_name + '_hbonds'
+        cmd.dist(hbonds_env_name, env_name, env_name, mode=2)
+        self.active_environments.append(hbonds_env_name)
+
+    def delete_active_environments(self):
+        """
+        Delete any created environments
+        """
+        for env in self.active_environments:
+            cmd.delete(env)
+        self.active_environments = []
+
     def cleanup(self):
         """
         Remove any changes this wizard has made to the scene.
         """
-        cmd.delete('wt_env')
-        cmd.delete('mut_env')
-        cmd.delete('mut_hbonds')
+        self.delete_active_environments()
         cmd.set_view(self.original_view)
         cmd.set_wizard()
 
+    def show_all_mutations(self):
+        """
+        Draws all mutations simultaneously
+        """
+        self.cleanup()
+        raise Exception('Not yet implemented')
 
 
 def wt_vs_mut(mutant_obj=None, wildtype_obj=None, focus_sele=None):
@@ -952,6 +977,10 @@ def does_sele_exist(sele):
     return False
 
 def get_score_from_matrix(pos1, pos2, score_matrix=blosum_62):
+    """
+    Return score from score_matrix if it exists. Otherwise (as for non-canonicals),
+    return generic score values for matches and mismatches.
+    """
     try:
         return score_matrix[pos1, pos2]
     except KeyError:
