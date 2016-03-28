@@ -852,7 +852,7 @@ def get_sequence(selection):
     sequence = collections.OrderedDict()
     str_to_int = int; aa_table = amino_acids
     sequence_builder = \
-            'sequence[str_to_int(resi), chain] = aa_table.get(resn, "")'
+            'sequence[str_to_int(resi), chain] = aa_table.get(resn, "X")'
     cmd.iterate(selection, sequence_builder, space=locals())
     return sequence
 
@@ -890,7 +890,7 @@ def get_alignment(seq1, seq2, score_matrix=blosum_62, gap_penalty=-20):
 
     for i in range(1, n+1):
         for j in range(1, m+1):
-            case1 = subproblems[i-1][j-1] + score_matrix[seq1[i-1], seq2[j-1]]
+            case1 = subproblems[i-1][j-1] + get_score_from_matrix(seq1[i-1], seq2[j-1], score_matrix=score_matrix)
             case2 = subproblems[i-1][j] + gap_penalty
             case3 = subproblems[i][j-1] + gap_penalty
             subproblems[i][j] = max(case1, case2, case3)
@@ -904,7 +904,7 @@ def get_alignment(seq1, seq2, score_matrix=blosum_62, gap_penalty=-20):
     j = m
     while i > 0 or j > 0:
         pos = subproblems[i][j]
-        case1 = subproblems[i-1][j-1] + score_matrix[seq1[i-1], seq2[j-1]]
+        case1 = subproblems[i-1][j-1] + get_score_from_matrix(seq1[i-1], seq2[j-1], score_matrix=score_matrix)
         case2 = subproblems[i-1][j] + gap_penalty
         case3 = subproblems[i][j-1] + gap_penalty
 
@@ -951,6 +951,14 @@ def does_sele_exist(sele):
                 return True
     return False
 
+def get_score_from_matrix(pos1, pos2, score_matrix=blosum_62):
+    try:
+        return score_matrix[pos1, pos2]
+    except KeyError:
+        if pos1 == pos2:
+            return 5
+        else:
+            return -4
 
 ## Add "wt_vs_mut" as pymol command
 cmd.extend('wt_vs_mut', wt_vs_mut)
