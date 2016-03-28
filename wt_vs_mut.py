@@ -7,26 +7,26 @@ from pymol.wizard import Wizard
 from pprint import pprint
 
 amino_acids = {
-        'ALA': 'A', 
-        'CYS': 'C', 
-        'ASP': 'D', 
-        'GLU': 'E', 
-        'GLY': 'G', 
-        'HIS': 'H', 
-        'ILE': 'I', 
-        'LYS': 'K', 
-        'LEU': 'L', 
-        'MET': 'M', 
-        'ASN': 'N', 
-        'PHE': 'F', 
-        'PRO': 'P', 
-        'GLN': 'Q', 
-        'ARG': 'R', 
-        'SER': 'S', 
-        'THR': 'T', 
-        'VAL': 'V', 
-        'TRP': 'W', 
-        'TYR': 'Y', 
+        'ALA': 'A',
+        'CYS': 'C',
+        'ASP': 'D',
+        'GLU': 'E',
+        'GLY': 'G',
+        'HIS': 'H',
+        'ILE': 'I',
+        'LYS': 'K',
+        'LEU': 'L',
+        'MET': 'M',
+        'ASN': 'N',
+        'PHE': 'F',
+        'PRO': 'P',
+        'GLN': 'Q',
+        'ARG': 'R',
+        'SER': 'S',
+        'THR': 'T',
+        'VAL': 'V',
+        'TRP': 'W',
+        'TYR': 'Y',
 }
 
 blosum_62 = {
@@ -448,12 +448,13 @@ blosum_62 = {
         ('V', 'T') :  0,
         ('V', 'W') : -3,
         ('V', 'Y') : -1,
-        ('V', 'V') :  4 }
+        ('V', 'V') :  4,
+}
 
 
 class WildtypeVsMutant (Wizard):
     """
-    Find the residues that differ between two selections and allow the user to 
+    Find the residues that differ between two selections and allow the user to
     view each difference one at a time.
     """
 
@@ -494,17 +495,17 @@ class WildtypeVsMutant (Wizard):
 
     def update_mutation_list(self):
         """
-        Find sequence differences between the wildtype and mutant structures to 
-        highlight.  Insertions and deletions are handled smoothly because the 
-        sequences are aligned (using the Nedleman-Wunsch algorithm) before they 
+        Find sequence differences between the wildtype and mutant structures to
+        highlight.  Insertions and deletions are handled smoothly because the
+        sequences are aligned (using the Nedleman-Wunsch algorithm) before they
         being compared.
         """
 
         if not self.wildtype_obj or not self.mutant_obj:
             return
 
-        # unaligned_seqmaps: A tuple of two ordered dictionaries mapping 
-        # (residue id, chain id) pairs to one-letter residue names.  These two 
+        # unaligned_seqmaps: A tuple of two ordered dictionaries mapping
+        # (residue id, chain id) pairs to one-letter residue names.  These two
         # mappings encode the sequences on the wildtype and mutant objects.
 
         unaligned_seqmaps = (
@@ -512,17 +513,17 @@ class WildtypeVsMutant (Wizard):
                 get_sequence(self.mutant_obj),
         )
 
-        # focus_resis: A list of all the (residue id, chain id) pairs for all 
-        # the residues the user is interested in, or undefined if the user is 
-        # interested in every residue.  If defined, the list will also contain 
-        # None tacked onto the end, indicating that the user is also interested 
+        # focus_resis: A list of all the (residue id, chain id) pairs for all
+        # the residues the user is interested in, or undefined if the user is
+        # interested in every residue.  If defined, the list will also contain
+        # None tacked onto the end, indicating that the user is also interested
         # in gaps.  Mutations not in this list should not be shown.
 
         if self.focus_sele:
             focus_resis = get_sequence(self.focus_sele).keys() + [None]
 
-        # unaligned_seqs: A tuple of two strings representing the sequences of 
-        # the wildtype and mutant objects.  The mapping to residue and chain 
+        # unaligned_seqs: A tuple of two strings representing the sequences of
+        # the wildtype and mutant objects.  The mapping to residue and chain
         # ids has been removed.
 
         unaligned_seqs = tuple(
@@ -530,15 +531,15 @@ class WildtypeVsMutant (Wizard):
                 for seqmap in unaligned_seqmaps
         )
 
-        # self.aligned_seqs: A tuple of two strings representing the aligned 
-        # wildtype and mutant sequences.  These sequences may differ from the 
-        # unaligned sequences in that they may have dashes inserted where the 
+        # self.aligned_seqs: A tuple of two strings representing the aligned
+        # wildtype and mutant sequences.  These sequences may differ from the
+        # unaligned sequences in that they may have dashes inserted where the
         # two sequences don't align well.
 
         self.aligned_seqs = get_alignment(*unaligned_seqs)
 
-        # self.aligned_resis: A tuple of two lists which associate (residue id, 
-        # chain id) pairs with each residue in the aligned sequences.  Missing 
+        # self.aligned_resis: A tuple of two lists which associate (residue id,
+        # chain id) pairs with each residue in the aligned sequences.  Missing
         # residues (i.e. dashes) are represented in these lists by None.
 
         self.aligned_resis = [], []
@@ -549,8 +550,8 @@ class WildtypeVsMutant (Wizard):
                         unaligned_seqmaps[i].popitem(last=False)[0]
                         if res != '-' else (None, None))
 
-        # self.mutations: A list of indices of positions that differ between 
-        # the two aligned sequences, excluding terminal gaps.  These indices 
+        # self.mutations: A list of indices of positions that differ between
+        # the two aligned sequences, excluding terminal gaps.  These indices
         # can be used with both self.aligned_seqs and self.aligned_resis.
 
         def in_focus_sele(i):
@@ -613,7 +614,7 @@ class WildtypeVsMutant (Wizard):
 
     def get_next_mutation(self):
         """
-        Return the index of the next mutation.  The index is relative to the 
+        Return the index of the next mutation.  The index is relative to the
         sequence alignment.
         """
         if not self.mutations:
@@ -627,8 +628,8 @@ class WildtypeVsMutant (Wizard):
 
     def get_mutation_name(self, muti=None):
         """
-        Return the name of given mutation.  The `muti' parameter is an index 
-        into the sequence alignment that defaults to the currently active 
+        Return the name of given mutation.  The `muti' parameter is an index
+        into the sequence alignment that defaults to the currently active
         mutation.  The names are formatted like so:
 
         Mutation:  D38E
@@ -643,9 +644,9 @@ class WildtypeVsMutant (Wizard):
         wildtype_res = self.aligned_seqs[0][muti]
         mutant_res = self.aligned_seqs[1][muti]
 
-        # Figure out the residue number from the wildtype (residue id, chain 
-        # id) list.  Insertions are handled specially.  For this case there is 
-        # no wildtype residue number, to we search back for the nearest non-gap 
+        # Figure out the residue number from the wildtype (residue id, chain
+        # id) list.  Insertions are handled specially.  For this case there is
+        # no wildtype residue number, to we search back for the nearest non-gap
         # in the wildtype sequence and use its number instead.
 
         resi = None
@@ -745,7 +746,7 @@ class WildtypeVsMutant (Wizard):
         """
         Take responsibility for handling key presses.
         """
-        # If the user presses Ctrl-Space (key, mod == 0, 2) cycle to the next 
+        # If the user presses Ctrl-Space (key, mod == 0, 2) cycle to the next
         # mutation.  Otherwise let pymol handle the key press.
 
         if self.wildtype_obj and self.mutant_obj:
@@ -754,9 +755,9 @@ class WildtypeVsMutant (Wizard):
             else:
                 return 0
 
-        # If the user hasn't specified a wildtype and a mutant object, prompt 
-        # for them.  Letters (key >= 32), Backspace (key in 8, 127), and Enter 
-        # (key in 10, 13) are handled specially.  Everything else is passed on 
+        # If the user hasn't specified a wildtype and a mutant object, prompt
+        # for them.  Letters (key >= 32), Backspace (key in 8, 127), and Enter
+        # (key in 10, 13) are handled specially.  Everything else is passed on
         # to pymol.
 
         else:
@@ -778,7 +779,7 @@ class WildtypeVsMutant (Wizard):
 
     def cycle(self):
         """
-        Focus on the next mutant, or close the wizard if the last mutant is 
+        Focus on the next mutant, or close the wizard if the last mutant is
         currently active.
         """
         try: self.set_active_mutation(self.get_next_mutation())
@@ -786,8 +787,8 @@ class WildtypeVsMutant (Wizard):
 
     def redraw(self):
         """
-        Highlight the sidechains around the current mutation.  Everything this 
-        method adds to the scene is put in its own object, so that it can be 
+        Highlight the sidechains around the current mutation.  Everything this
+        method adds to the scene is put in its own object, so that it can be
         easily undone by the next call to redraw() or cleanup().
         """
         cmd.refresh_wizard()
@@ -857,34 +858,34 @@ def get_sequence(selection):
 
 def get_alignment(seq1, seq2, score_matrix=blosum_62, gap_penalty=-20):
     """
-    Return the alignment between the two given sequences.  The alignment is 
-    performed using the Needleman-Wunsch algorithm, as implemented by Evan 
+    Return the alignment between the two given sequences.  The alignment is
+    performed using the Needleman-Wunsch algorithm, as implemented by Evan
     Dempsey and published on his blog:
 
     https://evandempsey.wordpress.com/2013/01/08/needleman-wunsch-algorithm-for-dna-sequence-alignment/
 
-    The default score function is BLOSUM62 and the default gap penalty is -20.  
-    This is a very large gap penalty because I want to discourage gaps as much 
-    as possible.  Each gap is taken as a mutation, so the more gaps there are 
-    the more things the user has to scroll through.  The point of the alignment 
-    is just to allow slightly different sequences to be compared, not to really 
+    The default score function is BLOSUM62 and the default gap penalty is -20.
+    This is a very large gap penalty because I want to discourage gaps as much
+    as possible.  Each gap is taken as a mutation, so the more gaps there are
+    the more things the user has to scroll through.  The point of the alignment
+    is just to allow slightly different sequences to be compared, not to really
     figure out the best way to match up each residue.
     """
     n = len(seq1)
     m = len(seq2)
- 
+
     # Make two-dimensional list for subproblem solutions.
 
     subproblems = [[0 for x in range(m+1)] for x in range(n+1)]
- 
+
     # Fill in zeros on both dimensions with gap penalties.
 
     for i in range(n+1):
         subproblems[i][0] = i * gap_penalty
- 
+
     for j in range(m+1):
         subproblems[0][j] = j * gap_penalty
- 
+
     # Calculate subproblem solutions.
 
     for i in range(1, n+1):
@@ -893,12 +894,12 @@ def get_alignment(seq1, seq2, score_matrix=blosum_62, gap_penalty=-20):
             case2 = subproblems[i-1][j] + gap_penalty
             case3 = subproblems[i][j-1] + gap_penalty
             subproblems[i][j] = max(case1, case2, case3)
- 
+
     # Backtrace to reconstruct optimal alignment.
 
     alignment1 = ''
     alignment2 = ''
- 
+
     i = n
     j = m
     while i > 0 or j > 0:
@@ -906,7 +907,7 @@ def get_alignment(seq1, seq2, score_matrix=blosum_62, gap_penalty=-20):
         case1 = subproblems[i-1][j-1] + score_matrix[seq1[i-1], seq2[j-1]]
         case2 = subproblems[i-1][j] + gap_penalty
         case3 = subproblems[i][j-1] + gap_penalty
- 
+
         if i > 0 and pos == case1:
             alignment1 = seq1[i-1] + alignment1
             alignment2 = seq2[j-1] + alignment2
@@ -925,7 +926,7 @@ def get_alignment(seq1, seq2, score_matrix=blosum_62, gap_penalty=-20):
 
 def find_mutations(alignment):
     """
-    Return a list of any indices that differ between the aligned sequences.  
+    Return a list of any indices that differ between the aligned sequences.
     Internal gaps are counted, but terminal gaps are not.
     """
     first_non_gap = max(
