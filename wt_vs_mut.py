@@ -461,7 +461,7 @@ class WildtypeVsMutant (Wizard):
     def __init__(self, wildtype_obj='', mutant_obj='', focus_sele=''):
         self.mutations = []
         self.active_environments = []
-        self.active_mutation = None
+        self.active_mutations = []
         self.aligned_seqs = '', ''
         self.aligned_resis = [], []
         self.neighbor_radius = 4
@@ -575,7 +575,7 @@ class WildtypeVsMutant (Wizard):
         """
         Set the mutation being currently highlighted.
         """
-        self.active_mutation = index
+        self.active_mutations = [index]
         self.redraw()
 
     def set_neighbor_radius(self, radius):
@@ -616,13 +616,13 @@ class WildtypeVsMutant (Wizard):
     def get_next_mutation(self):
         """
         Return the index of the next mutation.  The index is relative to the
-        sequence alignment.
+        sequence alignment. Resets to first mutation if multiple mutations are active.
         """
         if not self.mutations:
             return None
 
-        if self.active_mutation is not None:
-            index = self.mutations.index(self.active_mutation) + 1
+        if len(self.active_mutations) == 1:
+            index = self.mutations.index(self.active_mutations[0]) + 1
             return self.mutations[index]
         else:
             return self.mutations[0]
@@ -638,25 +638,36 @@ class WildtypeVsMutant (Wizard):
         Deletion:  D38-
         """
         if muti is None:
-            muti = self.active_mutation
+            mutis = self.active_mutations
+        else:
+            mutis = [muti]
 
-        # Figure out the one-letter residue names from the alignment.
+        return_string = ''
+        for i, muti in enumerate(mutis):
+            # Figure out the one-letter residue names from the alignment.
 
-        wildtype_res = self.aligned_seqs[0][muti]
-        mutant_res = self.aligned_seqs[1][muti]
+            wildtype_res = self.aligned_seqs[0][muti]
+            mutant_res = self.aligned_seqs[1][muti]
 
-        # Figure out the residue number from the wildtype (residue id, chain
-        # id) list.  Insertions are handled specially.  For this case there is
-        # no wildtype residue number, to we search back for the nearest non-gap
-        # in the wildtype sequence and use its number instead.
+            # Figure out the residue number from the wildtype (residue id, chain
+            # id) list.  Insertions are handled specially.  For this case there is
+            # no wildtype residue number, to we search back for the nearest non-gap
+            # in the wildtype sequence and use its number instead.
 
-        resi = None
-        while resi is None:
-            resi, chain = self.aligned_resis[0][muti]; muti -= 1
+            resi = None
+            while resi is None:
+                resi, chain = self.aligned_resis[0][muti]; muti -= 1
+
+            if i + 1 >= len(mutis):
+                format_string = '{}{}{}'
+            else:
+                format_string = '{}{}{}, '
+
+            return_string += format_string.format(wildtype_res, resi, mutant_res)
 
         # Return the concatenated name.
 
-        return '{}{}{}'.format(wildtype_res, resi, mutant_res)
+        return return_string
 
     def get_panel(self):
         if not self.mutant_obj or not self.wildtype_obj:
@@ -668,6 +679,7 @@ class WildtypeVsMutant (Wizard):
         buttons = [
             [1, 'Wildtype vs Mutant Wizard', ''],
             [2, 'View next mutation', 'cmd.get_wizard().cycle()'],
+            [2, 'Show all mutations', 'cmd.get_wizard().show_all_mutations()'],
             [3, 'Wildtype highlight: {}'.format(self.wildtype_hilite), 'wt_hilite'],
             [3, 'Mutant highlight: {}'.format(self.mutant_hilite), 'mut_hilite'],
             [3, 'Neighbor radius: {0:.1f}A'.format(self.neighbor_radius), 'radius'],
@@ -678,7 +690,7 @@ class WildtypeVsMutant (Wizard):
         for muti in self.mutations:
             command = 'cmd.get_wizard().set_active_mutation({})'
             name = self.get_mutation_name(muti)
-            if self.active_mutation == muti: name += ' <--'
+            if muti in self.active_mutations: name += ' <--'
             buttons += [[2, name, command.format(muti)]]
 
         buttons += [[2, 'Done', 'cmd.get_wizard().cleanup()']]
@@ -793,39 +805,48 @@ class WildtypeVsMutant (Wizard):
         easily undone by the next call to redraw() or cleanup().
         """
         cmd.refresh_wizard()
-        if not self.active_mutation: return
 
-        print self.get_mutation_name( self.active_mutation )
-
-        wt_obj = self.wildtype_obj
-        wt_resi, wt_chain = self.aligned_resis[0][self.active_mutation]
-        wt_sele = 'none' if wt_resi is None else \
-                  'resi {} and chain {}'.format(wt_resi, wt_chain)
-        mut_obj = self.mutant_obj
-        mut_resi, mut_chain = self.aligned_resis[1][self.active_mutation]
-        mut_sele = 'none' if mut_resi is None else \
-                  'resi {} and chain {}'.format(mut_resi, mut_chain)
-        h_sele = (
-                '(elem H and (neighbor elem C))' if self.show_polar_h else
-                '(elem H)')
-        env_sele = (
-                '(byres {{}} within {self.neighbor_radius} of '
-                '(({wt_obj} and {wt_sele}) or ({mut_obj} and {mut_sele}))) '
-                'and not {h_sele}'.format(**locals()))
-
-        intial_view = cmd.get_view()
         self.delete_active_environments()
-        self.create_environment('wt_env', env_sele.format(wt_obj))
-        self.create_environment('mut_env', env_sele.format(mut_obj))
-        self.draw_self_self_hbonds('mut_env')
-        if self.wildtype_hilite != 'none':
-            cmd.color(self.wildtype_hilite, 'wt_env and {wt_sele} and elem C'.format(**locals()))
-        if self.mutant_hilite != 'none':
-            cmd.color(self.mutant_hilite, 'mut_env and {mut_sele} and elem C'.format(**locals()))
-        cmd.show_as('sticks', 'wt_env')
-        cmd.show_as('sticks', 'mut_env')
-        cmd.set_view(intial_view)
-        cmd.zoom('wt_env', buffer=self.zoom_padding, animate=-1)
+
+        for muti in self.active_mutations:
+            wt_obj = self.wildtype_obj
+            wt_resi, wt_chain = self.aligned_resis[0][muti]
+            wt_sele = 'none' if wt_resi is None else \
+                      'resi {} and chain {}'.format(wt_resi, wt_chain)
+            mut_obj = self.mutant_obj
+            mut_resi, mut_chain = self.aligned_resis[1][muti]
+            mut_sele = 'none' if mut_resi is None else \
+                      'resi {} and chain {}'.format(mut_resi, mut_chain)
+            h_sele = (
+                    '(elem H and (neighbor elem C))' if self.show_polar_h else
+                    '(elem H)')
+            env_sele = (
+                    '(byres {{}} within {self.neighbor_radius} of '
+                    '(({wt_obj} and {wt_sele}) or ({mut_obj} and {mut_sele}))) '
+                    'and not {h_sele}'.format(**locals()))
+
+            initial_view = cmd.get_view()
+
+            if len(self.active_mutations) > 1:
+                wt_env_name = 'wt_env_' + self.get_mutation_name(muti)
+                mut_env_name = 'mut_env_' + self.get_mutation_name(muti)
+            else:
+                wt_env_name = 'wt_env'
+                mut_env_name = 'wt_env'
+
+            self.create_environment(wt_env_name, env_sele.format(wt_obj))
+            self.create_environment(mut_env_name, env_sele.format(mut_obj))
+            self.draw_self_self_hbonds(mut_env_name)
+            if self.wildtype_hilite != 'none':
+                cmd.color(self.wildtype_hilite, '{wt_env_name} and {wt_sele} and elem C'.format(**locals()))
+            if self.mutant_hilite != 'none':
+                cmd.color(self.mutant_hilite, '{mut_env_name} and {mut_sele} and elem C'.format(**locals()))
+            cmd.show_as('sticks', wt_env_name)
+            cmd.show_as('sticks', mut_env_name)
+
+        if len(self.active_mutations) == 1:
+            cmd.set_view(initial_view)
+            cmd.zoom(wt_env_name, buffer=self.zoom_padding, animate=-1)
 
     def create_environment(self, env_name, env):
         """
@@ -859,8 +880,10 @@ class WildtypeVsMutant (Wizard):
         """
         Draws all mutations simultaneously
         """
-        self.cleanup()
-        raise Exception('Not yet implemented')
+        self.delete_active_environments()
+        self.active_mutations = self.mutations
+        self.redraw()
+        cmd.set_view(self.original_view)
 
 
 def wt_vs_mut(mutant_obj=None, wildtype_obj=None, focus_sele=None):
