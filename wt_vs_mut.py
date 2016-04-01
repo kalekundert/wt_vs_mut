@@ -837,6 +837,7 @@ class WildtypeVsMutant (Wizard):
             self.create_environment(wt_env_name, env_sele.format(wt_obj))
             self.create_environment(mut_env_name, env_sele.format(mut_obj))
             self.draw_self_self_hbonds(mut_env_name)
+            # self.draw_self_self_hbonds(wt_env_name, start_displayed = False)
             if self.wildtype_hilite != 'none':
                 cmd.color(self.wildtype_hilite, '{wt_env_name} and {wt_sele} and elem C'.format(**locals()))
             if self.mutant_hilite != 'none':
@@ -855,9 +856,11 @@ class WildtypeVsMutant (Wizard):
         cmd.create(env_name, env)
         self.active_environments.append(env_name)
 
-    def draw_self_self_hbonds(self, env_name):
+    def draw_self_self_hbonds(self, env_name, start_displayed = True):
         hbonds_env_name = env_name + '_hbonds'
-        cmd.dist(hbonds_env_name, env_name, env_name, mode=2)
+        cmd.distance(hbonds_env_name, env_name, env_name, mode=2)
+        if not start_displayed:
+            cmd.disable(hbonds_env_name)
         self.active_environments.append(hbonds_env_name)
 
     def delete_active_environments(self):
