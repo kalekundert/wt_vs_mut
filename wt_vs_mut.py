@@ -460,7 +460,6 @@ class WildtypeVsMutant (Wizard):
 
     def __init__(self, wildtype_obj='', mutant_obj='', focus_sele=''):
         self.mutations = []
-        self.active_environments = []
         self.active_mutations = []
         self.aligned_seqs = '', ''
         self.aligned_resis = [], []
@@ -481,17 +480,20 @@ class WildtypeVsMutant (Wizard):
 
     def set_wildtype_object(self, wildtype_obj):
         self.wildtype_obj = wildtype_obj
-        self.active_prompt = ''; self.redraw()
+        self.active_prompt = ''
+        self.redraw()
         self.update_mutation_list()
 
     def set_mutant_object(self, mutant_obj):
         self.mutant_obj = mutant_obj
-        self.active_prompt = ''; self.redraw()
+        self.active_prompt = ''
+        self.redraw()
         self.update_mutation_list()
 
     def set_focus_sele(self, focus_sele):
         self.focus_sele = focus_sele
-        self.active_prompt = ''; self.redraw()
+        self.active_prompt = ''
+        self.redraw()
         self.update_mutation_list()
 
     def update_mutation_list(self):
@@ -569,7 +571,7 @@ class WildtypeVsMutant (Wizard):
 
         # Automatically zoom in on the first mutation.
 
-        self.cycle()
+        self.show_next_mutation()
 
     def set_active_mutation(self, index):
         """
@@ -616,7 +618,8 @@ class WildtypeVsMutant (Wizard):
     def get_next_mutation(self):
         """
         Return the index of the next mutation.  The index is relative to the
-        sequence alignment. Resets to first mutation if multiple mutations are active.
+        sequence alignment. Resets to first mutation if multiple mutations are 
+        active.
         """
         if not self.mutations:
             return None
@@ -631,7 +634,7 @@ class WildtypeVsMutant (Wizard):
         """
         Return the name of given mutation.  The `muti' parameter is an index
         into the sequence alignment that defaults to the currently active
-        mutation.  The names are formatted like so:
+        mutation.  The returned name will be formatted like so:
 
         Mutation:  D38E
         Insertion: -38E
@@ -678,7 +681,7 @@ class WildtypeVsMutant (Wizard):
 
         buttons = [
             [1, 'Wildtype vs Mutant Wizard', ''],
-            [2, 'View next mutation', 'cmd.get_wizard().cycle()'],
+            [2, 'Show next mutation', 'cmd.get_wizard().show_next_mutation()'],
             [2, 'Show all mutations', 'cmd.get_wizard().show_all_mutations()'],
             [3, 'Wildtype highlight: {}'.format(self.wildtype_hilite), 'wt_hilite'],
             [3, 'Mutant highlight: {}'.format(self.mutant_hilite), 'mut_hilite'],
@@ -690,7 +693,8 @@ class WildtypeVsMutant (Wizard):
         for muti in self.mutations:
             command = 'cmd.get_wizard().set_active_mutation({})'
             name = self.get_mutation_name(muti)
-            if muti in self.active_mutations: name += ' <--'
+            if muti in self.active_mutations:
+                name = '\\090' + name
             buttons += [[2, name, command.format(muti)]]
 
         buttons += [[2, 'Done', 'cmd.get_wizard().cleanup()']]
@@ -759,12 +763,12 @@ class WildtypeVsMutant (Wizard):
         """
         Take responsibility for handling key presses.
         """
-        # If the user presses Ctrl-Space (key, mod == 0, 2) cycle to the next
+        # If the user presses Ctrl-Space (key, mod == 0, 2), show the next
         # mutation.  Otherwise let pymol handle the key press.
 
         if self.wildtype_obj and self.mutant_obj:
             if (key, mod) == (0, 2):
-                self.cycle()
+                self.show_next_mutation()
             else:
                 return 0
 
@@ -790,103 +794,115 @@ class WildtypeVsMutant (Wizard):
     def get_event_mask(self):
         return Wizard.event_mask_key
 
-    def cycle(self):
+    def show_next_mutation(self):
         """
         Focus on the next mutant, or close the wizard if the last mutant is
         currently active.
         """
-        try: self.set_active_mutation(self.get_next_mutation())
-        except IndexError: self.cleanup()
-
-    def redraw(self):
-        """
-        Highlight the sidechains around the current mutation.  Everything this
-        method adds to the scene is put in its own object, so that it can be
-        easily undone by the next call to redraw() or cleanup().
-        """
-        cmd.refresh_wizard()
-
-        self.delete_active_environments()
-
-        for muti in self.active_mutations:
-            wt_obj = self.wildtype_obj
-            wt_resi, wt_chain = self.aligned_resis[0][muti]
-            wt_sele = 'none' if wt_resi is None else \
-                      'resi {} and chain {}'.format(wt_resi, wt_chain)
-            mut_obj = self.mutant_obj
-            mut_resi, mut_chain = self.aligned_resis[1][muti]
-            mut_sele = 'none' if mut_resi is None else \
-                      'resi {} and chain {}'.format(mut_resi, mut_chain)
-            h_sele = (
-                    '(elem H and (neighbor elem C))' if self.show_polar_h else
-                    '(elem H)')
-            env_sele = (
-                    '(byres {{}} within {self.neighbor_radius} of '
-                    '(({wt_obj} and {wt_sele}) or ({mut_obj} and {mut_sele}))) '
-                    'and not {h_sele}'.format(**locals()))
-
-            initial_view = cmd.get_view()
-
-            if len(self.active_mutations) > 1:
-                wt_env_name = 'wt_env_' + self.get_mutation_name(muti)
-                mut_env_name = 'mut_env_' + self.get_mutation_name(muti)
-            else:
-                wt_env_name = 'wt_env'
-                mut_env_name = 'mut_env'
-
-            self.create_environment(wt_env_name, env_sele.format(wt_obj))
-            self.create_environment(mut_env_name, env_sele.format(mut_obj))
-            self.draw_self_self_hbonds(mut_env_name)
-            self.draw_self_self_hbonds(wt_env_name, start_displayed = False)
-            if self.wildtype_hilite != 'none':
-                cmd.color(self.wildtype_hilite, '{wt_env_name} and {wt_sele} and elem C'.format(**locals()))
-            if self.mutant_hilite != 'none':
-                cmd.color(self.mutant_hilite, '{mut_env_name} and {mut_sele} and elem C'.format(**locals()))
-            cmd.show_as('sticks', wt_env_name)
-            cmd.show_as('sticks', mut_env_name)
-
-        if len(self.active_mutations) == 1:
-            cmd.set_view(initial_view)
-            cmd.zoom(wt_env_name, buffer=self.zoom_padding, animate=-1)
-
-    def create_environment(self, env_name, env):
-        """
-        Create a new environment in PyMOL, and keep track of it in member variable.
-        """
-        cmd.create(env_name, env)
-        self.active_environments.append(env_name)
-
-    def draw_self_self_hbonds(self, env_name, start_displayed = True):
-        hbonds_env_name = env_name + '_hbonds'
-        cmd.distance(hbonds_env_name, env_name, env_name, mode=2)
-        if not start_displayed:
-            cmd.disable(hbonds_env_name)
-        self.active_environments.append(hbonds_env_name)
-
-    def delete_active_environments(self):
-        """
-        Delete any created environments
-        """
-        for env in self.active_environments:
-            cmd.delete(env)
-        self.active_environments = []
-
-    def cleanup(self):
-        """
-        Remove any changes this wizard has made to the scene.
-        """
-        self.delete_active_environments()
-        cmd.set_view(self.original_view)
-        cmd.set_wizard()
+        try:
+            self.set_active_mutation(self.get_next_mutation())
+        except IndexError:
+            self.cleanup()
 
     def show_all_mutations(self):
         """
-        Draws all mutations simultaneously
+        Show all the mutations simultaneously.
         """
-        self.delete_active_environments()
         self.active_mutations = self.mutations
         self.redraw()
+
+    def redraw(self):
+        """
+        Highlight the sidechains around the active mutation(s).  Everything 
+        this method adds to the scene is put in its own object, so that it can 
+        be easily undone by the next call to redraw() or cleanup().
+        """
+        cmd.refresh_wizard()
+        if not self.active_mutations:
+            return
+
+        wt_obj = self.wildtype_obj
+        mut_obj = self.mutant_obj
+
+        # wt_seles and mut_seles: lists containing individual pymol selection 
+        # expressions for each residue that the user wants to see.
+
+        wt_seles = []
+        mut_seles = []
+
+        for muti in self.active_mutations:
+            wt_resi, wt_chain = self.aligned_resis[0][muti]
+            mut_resi, mut_chain = self.aligned_resis[1][muti]
+            if wt_resi is not None:
+                wt_seles.append('(resi {wt_resi} and chain {wt_chain})'.format(**locals()))
+            if mut_resi is not None:
+                mut_seles.append('(resi {mut_resi} and chain {mut_chain})'.format(**locals()))
+
+        # wt_sele and mut_sele: Pymol selection expressions that combine all 
+        # the individual selections in wt_seles and mut_seles.
+
+        wt_sele = '({})'.format(' or '.join(wt_seles)) if wt_seles else 'none'
+        mut_sele = '({})'.format(' or '.join(mut_seles)) if mut_seles else 'none'
+
+        # env_sele: A pymol selection expression that specifies all which 
+        # residues are close enough to the mutation(s) to be considered part of 
+        # the "environment".  This selection is actually a template, and needs 
+        # to be formatted with either wt_obj or mut_obj before use.
+
+        h_sele = (
+                '(elem H and (neighbor elem C))' if self.show_polar_h else
+                '(elem H)')
+        env_sele = (
+                '(byres {{}} within {self.neighbor_radius} of '
+                  '(({wt_obj} and {wt_sele}) or ({mut_obj} and {mut_sele})))'
+                'and not {h_sele}'.format(**locals()))
+
+        # Render the scene into the wt_env, mut_env, wt_hbonds, and mut_hbonds 
+        # objects.  Limiting ourselves to these objects makes it easy to redraw 
+        # our comparisons without getting in the user's way, or vice versa.
+
+        initial_view = cmd.get_view()
+
+        cmd.delete('wt_env')
+        cmd.delete('mut_env')
+        cmd.delete('wt_hbonds')
+        cmd.delete('mut_hbonds')
+
+        cmd.create('wt_env', env_sele.format(wt_obj))
+        cmd.create('mut_env', env_sele.format(mut_obj))
+
+        # Hide the wildtype polar contacts by default, because I'm more often 
+        # interested in the contacts being made in the design.
+
+        cmd.distance('wt_hbonds', 'wt_env', 'wt_env', mode=2)
+        cmd.distance('mut_hbonds', 'mut_env', 'mut_env', mode=2)
+        cmd.disable('wt_hbonds')
+
+        cmd.show_as('sticks', 'wt_env')
+        cmd.show_as('sticks', 'mut_env')
+
+        if self.wildtype_hilite != 'none':
+            cmd.color(self.wildtype_hilite, 'wt_env and {wt_sele} and elem C'.format(**locals()))
+        if self.mutant_hilite != 'none':
+            cmd.color(self.mutant_hilite, 'mut_env and {mut_sele} and elem C'.format(**locals()))
+
+        # Pan smoothly to the new scene.
+
+        cmd.set_view(initial_view)
+        cmd.zoom('mut_env', buffer=self.zoom_padding, animate=-1)
+
+    def cleanup(self):
+        """
+        Remove any changes this wizard made to the user's session.
+        """
+        cmd.delete('wt_env')
+        cmd.delete('mut_env')
+        cmd.delete('wt_hbonds')
+        cmd.delete('mut_hbonds')
+
         cmd.set_view(self.original_view)
+        cmd.set_wizard()
+
 
 
 def wt_vs_mut(mutant_obj=None, wildtype_obj=None, focus_sele=None):
