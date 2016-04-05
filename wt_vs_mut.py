@@ -479,18 +479,29 @@ class WildtypeVsMutant (Wizard):
         self.set_mutant_object(mutant_obj)
 
     def set_wildtype_object(self, wildtype_obj):
+        """
+        Specify which object should be considered the "wildtype".
+        """
         self.wildtype_obj = wildtype_obj
         self.active_prompt = ''
         self.redraw()
         self.update_mutation_list()
 
     def set_mutant_object(self, mutant_obj):
+        """
+        Specify which object should be considered the "mutant".
+        """
         self.mutant_obj = mutant_obj
         self.active_prompt = ''
         self.redraw()
         self.update_mutation_list()
 
     def set_focus_sele(self, focus_sele):
+        """
+        Specify which atoms the user is interested in comparing.  For example, 
+        if the given selection comprises the interface between two proteins, 
+        the rest of the wizard will only consider mutations in that region.
+        """
         self.focus_sele = focus_sele
         self.active_prompt = ''
         self.redraw()
@@ -503,7 +514,6 @@ class WildtypeVsMutant (Wizard):
         sequences are aligned (using the Nedleman-Wunsch algorithm) before they
         being compared.
         """
-
         if not self.wildtype_obj or not self.mutant_obj:
             return
 
@@ -673,11 +683,36 @@ class WildtypeVsMutant (Wizard):
         return return_string
 
     def get_panel(self):
+        """
+        Return a list of lists describing the entries that should appear in the 
+        right-hand panel of the GUI (below all the selections) when the wizard 
+        is running.  The first few entries control common actions and basic 
+        settings.  The remaining entries are buttons that the user can press to 
+        see specific mutations.
+        """
+
+        # Each entry is described by a list with 3 elements.  The first element 
+        # is a number that specifies the type of entry: 1 for text, 2 for a 
+        # button, 3 for a menu.  The second element is the text that will be 
+        # seen by the user.  The third element is an argument that means 
+        # different things for each type of entry.  For buttons, it's a piece 
+        # of code (given as a string) that should be executed when the button 
+        # is pressed.  For menus, it's a "tag" that can be passed to get_menu()
+        # to get a description of the menu in question.
+
+        # If the user hasn't provided wildtype and mutant objects yet, then 
+        # get_prompt() should be leading them through the process of doing 
+        # that.  Until then, just display the name of the wizard and the option 
+        # to quit.
+
         if not self.mutant_obj or not self.wildtype_obj:
             return [
                 [1, 'Wildtype vs Mutant Wizard', ''],
                 [2, 'Cancel', 'cmd.get_wizard().cleanup()'],
             ]
+
+        # Make the buttons and menus that control the basic actions and 
+        # settings that don't depend on the specific system being studied.
 
         buttons = [
             [1, 'Wildtype vs Mutant Wizard', ''],
@@ -690,6 +725,10 @@ class WildtypeVsMutant (Wizard):
             [3, 'Polar hydrogens: {}'.format('show' if self.show_polar_h else 'hide'), 'hydrogen'],
         ]
 
+        # Make a button for each mutation.  The user can click on these buttons 
+        # to view specific mutations.  The button text turns green if the user 
+        # is currently viewing the associated mutation.
+
         for muti in self.mutations:
             command = 'cmd.get_wizard().set_active_mutation({})'
             name = self.get_mutation_name(muti)
@@ -697,10 +736,17 @@ class WildtypeVsMutant (Wizard):
                 name = '\\090' + name
             buttons += [[2, name, command.format(muti)]]
 
+        # Make a quit button and return the buttons data structure.
+
         buttons += [[2, 'Done', 'cmd.get_wizard().cleanup()']]
         return buttons
 
     def get_menu(self, tag):
+        """
+        Return a dictionary describing the entries in the menu associated with 
+        the given tag.  These tags come from get_panel(), so each menu is 
+        associated with one buttons on the right-hand side of the GUI.
+        """
         menus = {
             'wt_hilite': [[2, 'Highlight Color', '']],
             'mut_hilite': [[2, 'Highlight Color', '']],
@@ -730,7 +776,7 @@ class WildtypeVsMutant (Wizard):
                 'cmd.get_wizard().set_mutant_hilite("{}")'.format(color[4:])]]
 
         # Define the neighbor radius menu.
-        for radius in range(1, 11):
+        for radius in range(11):
             menus['radius'] += [[
                 1, '{0:0.1f}A'.format(radius),
                 'cmd.get_wizard().set_neighbor_radius({})'.format(radius)]]
@@ -751,6 +797,11 @@ class WildtypeVsMutant (Wizard):
         return menus[tag]
 
     def get_prompt(self):
+        """
+        Return text to be displayed in the top left corner of the view area.
+        If the user has not yet provided wildtype and mutant objects, prompt 
+        for that.  Otherwise, tell the user about the <Ctrl-Space> hotkey.
+        """
         # The \999 code changes the text color to white.
         if not self.wildtype_obj:
             return ["Select the wildtype object: \\999{}".format(self.active_prompt)]
@@ -1009,15 +1060,6 @@ def find_mutations(alignment):
             if alignment[0][i] != alignment[1][i]
     ]
 
-def does_sele_exist(sele):
-    from types import ListType
-    session = cmd.get_session()
-    for i in session["names"]:
-        if type(i) is ListType:
-            if sele == i[0]:
-                return True
-    return False
-
 def get_score_from_matrix(pos1, pos2, score_matrix=blosum_62):
     """
     Return score from score_matrix if it exists. Otherwise (as for non-canonicals),
@@ -1030,6 +1072,7 @@ def get_score_from_matrix(pos1, pos2, score_matrix=blosum_62):
             return 5
         else:
             return -4
+
 
 ## Add "wt_vs_mut" as pymol command
 cmd.extend('wt_vs_mut', wt_vs_mut)
