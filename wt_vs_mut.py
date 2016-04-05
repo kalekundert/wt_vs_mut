@@ -832,12 +832,12 @@ class WildtypeVsMutant (Wizard):
                 mut_env_name = 'mut_env_' + self.get_mutation_name(muti)
             else:
                 wt_env_name = 'wt_env'
-                mut_env_name = 'wt_env'
+                mut_env_name = 'mut_env'
 
             self.create_environment(wt_env_name, env_sele.format(wt_obj))
             self.create_environment(mut_env_name, env_sele.format(mut_obj))
             self.draw_self_self_hbonds(mut_env_name)
-            # self.draw_self_self_hbonds(wt_env_name, start_displayed = False)
+            self.draw_self_self_hbonds(wt_env_name, start_displayed = False)
             if self.wildtype_hilite != 'none':
                 cmd.color(self.wildtype_hilite, '{wt_env_name} and {wt_sele} and elem C'.format(**locals()))
             if self.mutant_hilite != 'none':
