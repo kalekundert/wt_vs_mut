@@ -85,7 +85,6 @@ class WildtypeVsMutant (Wizard):
         """
         self.wildtype_obj = wildtype_obj
         self.active_prompt = ''
-        self.redraw()
         self.update_mutation_list()
 
     def set_mutant_object(self, mutant_obj):
@@ -94,7 +93,6 @@ class WildtypeVsMutant (Wizard):
         """
         self.mutant_obj = mutant_obj
         self.active_prompt = ''
-        self.redraw()
         self.update_mutation_list()
 
     def set_focus_sele(self, focus_sele):
@@ -105,7 +103,6 @@ class WildtypeVsMutant (Wizard):
         """
         self.focus_sele = focus_sele
         self.active_prompt = ''
-        self.redraw()
         self.update_mutation_list()
 
     def update_mutation_list(self):
@@ -233,7 +230,7 @@ class WildtypeVsMutant (Wizard):
         active.
         """
         if not self.mutations:
-            return None
+            raise IndexError
 
         if len(self.active_mutations) == 1:
             index = self.mutations.index(self.active_mutations[0]) + 1
@@ -308,22 +305,36 @@ class WildtypeVsMutant (Wizard):
 
         if not self.mutant_obj or not self.wildtype_obj:
             return [
-                [1, 'Wildtype vs Mutant Wizard', ''],
-                [2, 'Cancel', 'cmd.get_wizard().cleanup()'],
+                [1, "Wildtype vs Mutant Wizard", ''],
+                [2, "Cancel", 'cmd.get_wizard().cleanup()'],
+            ]
+
+        # If the user has provided wildtype and mutant objects, but no 
+        # mutations were found, show an error message.
+
+        if not self.mutations:
+            from textwrap import wrap
+            return [
+                [1, "Wildtype vs Mutant Wizard", ''],
+            ] + [
+                [1, '\\900' + x, '']
+                for x in wrap("No mutations found.  Do `{0}' and `{1}' have the same sequence?".format(self.wildtype_obj, self.mutant_obj), 26)
+            ] + [
+                [2, "Cancel", 'cmd.get_wizard().cleanup()'],
             ]
 
         # Make the buttons and menus that control the basic actions and 
         # settings that don't depend on the specific system being studied.
 
         buttons = [
-            [1, 'Wildtype vs Mutant Wizard', ''],
-            [2, 'Show next mutation', 'cmd.get_wizard().show_next_mutation()'],
-            [2, 'Show all mutations', 'cmd.get_wizard().show_all_mutations()'],
-            [3, 'Wildtype highlight: {}'.format(self.wildtype_hilite), 'wt_hilite'],
-            [3, 'Mutant highlight: {}'.format(self.mutant_hilite), 'mut_hilite'],
-            [3, 'Neighbor radius: {0:.1f}A'.format(self.neighbor_radius), 'radius'],
-            [3, 'Zoom padding: {0:.1f}A'.format(self.zoom_padding), 'padding'],
-            [3, 'Polar hydrogens: {}'.format('show' if self.show_polar_h else 'hide'), 'hydrogen'],
+            [1, "Wildtype vs Mutant Wizard", ''],
+            [2, "Show next mutation", 'cmd.get_wizard().show_next_mutation()'],
+            [2, "Show all mutations", 'cmd.get_wizard().show_all_mutations()'],
+            [3, "Wildtype highlight: {}".format(self.wildtype_hilite), 'wt_hilite'],
+            [3, "Mutant highlight: {}".format(self.mutant_hilite), 'mut_hilite'],
+            [3, "Neighbor radius: {0:.1f}A".format(self.neighbor_radius), 'radius'],
+            [3, "Zoom padding: {0:.1f}A".format(self.zoom_padding), 'padding'],
+            [3, "Polar hydrogens: {}".format('show' if self.show_polar_h else 'hide'), 'hydrogen'],
         ]
 
         # Make a button for each mutation.  The user can click on these buttons 
@@ -339,7 +350,7 @@ class WildtypeVsMutant (Wizard):
 
         # Make a quit button and return the buttons data structure.
 
-        buttons += [[2, 'Done', 'cmd.get_wizard().cleanup()']]
+        buttons += [[2, "Done", 'cmd.get_wizard().cleanup()']]
         return buttons
 
     def get_menu(self, tag):
@@ -408,6 +419,8 @@ class WildtypeVsMutant (Wizard):
             return ["Select the wildtype object: \\999{}".format(self.active_prompt)]
         elif not self.mutant_obj:
             return ["Select the mutant object: \\999{}".format(self.active_prompt)]
+        elif not self.mutations:
+            return
         else:
             return ["Press <Ctrl-Space> to view the next mutation..."]
 
@@ -454,7 +467,7 @@ class WildtypeVsMutant (Wizard):
         try:
             self.set_active_mutation(self.get_next_mutation())
         except IndexError:
-            self.cleanup()
+            self.cleanup() if self.mutations else self.redraw()
 
     def show_all_mutations(self):
         """
@@ -663,16 +676,14 @@ def find_mutations(alignment):
 
 def get_score_from_matrix(pos1, pos2, score_matrix=blosum_62):
     """
-    Return score from score_matrix if it exists. Otherwise (as for non-canonicals),
-    return generic score values for matches and mismatches.
+    Return score from score_matrix if it exists. Otherwise (e.g. for 
+    non-canonicals), return generic score values for matches and 
+    mismatches.
     """
     try:
         return score_matrix[pos1, pos2]
     except KeyError:
-        if pos1 == pos2:
-            return 5
-        else:
-            return -4
+        return 5 if pos1 == pos2 else -4
 
 
 ## Add "wt_vs_mut" as pymol command
@@ -686,10 +697,10 @@ sys.modules['pymol.wizard.wt_vs_mut'] = sys.modules[__name__]
 ## Add item to plugin menu
 try:
     from pymol.plugins import addmenuitem
-    def __init_plugin__(self): # (no fold)
+    def __init_plugin__(self): #
         addmenuitem('Wildtype vs. Mutant', lambda s=self: wt_vs_mut())
 except:
-    def __init__(self): # (no fold)
+    def __init__(self): #
         self.menuBar.addmenuitem(
                 'Plugin', 'command', 'Wildtype vs. Mutant',
                 label='Wildtype vs. Mutant', command=lambda s=self: wt_vs_mut())
