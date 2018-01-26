@@ -64,11 +64,14 @@ class WildtypeVsMutant (Wizard):
         self.active_mutations = []
         self.aligned_seqs = '', ''
         self.aligned_resis = [], []
+        self.extra_positions = set()
         self.neighbor_radius = 4
         self.zoom_padding = 5
+        self.flip_dist_cutoff = 4.0  # 2.0 counts rotating aromatic rings 180°
         self.wildtype_hilite = 'white'
         self.mutant_hilite = 'yellow'
         self.show_polar_h = False
+        self.mutation_mode = 'mutations'  # also allowed: 'muts+flips'
         self.active_prompt = ''
         self.original_view = cmd.get_view()
         self.wildtype_obj = ''
@@ -105,7 +108,7 @@ class WildtypeVsMutant (Wizard):
         self.active_prompt = ''
         self.update_mutation_list()
 
-    def update_mutation_list(self):
+    def update_mutation_list(self, show_next_mutation=True):
         """
         Find sequence differences between the wildtype and mutant structures to
         highlight.  Insertions and deletions are handled smoothly because the
@@ -161,25 +164,86 @@ class WildtypeVsMutant (Wizard):
                         unaligned_seqmaps[i].popitem(last=False)[0]
                         if res != '-' else (None, None))
 
-        # self.mutations: A list of indices of positions that differ between
+        # mutations: A set of indices of positions that differ between
         # the two aligned sequences, excluding terminal gaps.  These indices
         # can be used with both self.aligned_seqs and self.aligned_resis.
 
-        def in_focus_sele(i):
+        def in_focus_sele(i): #
             if not self.focus_sele:
                 return True
             else:
                 return (self.aligned_resis[0][i] in focus_resis or
                         self.aligned_resis[1][i] in focus_resis)
 
-        self.mutations = [
+        mutations = {
                 i for i in find_mutations(self.aligned_seqs)
                 if in_focus_sele(i)
-        ]
+        }
+
+        if self.mutation_mode == 'muts+flips':
+            mutations |= {
+                    i for i in self.find_flips()
+                    if in_focus_sele(i)
+            }
+
+        # self.mutations: A list of indices of positions that should be 
+        # displayed for the user to inspect.  This could include any positions 
+        # that have mutated, have undergone sidechain flips, or have just been 
+        # selected by the user.  These indices can be used with both 
+        # self.aligned_seqs and self.aligned_resis.
+
+        self.mutations = sorted(mutations | self.extra_positions)
 
         # Automatically zoom in on the first mutation.
 
-        self.show_next_mutation()
+        if show_next_mutation:
+            self.show_next_mutation()
+
+    def find_flips(self):
+        """
+        Yield the indices of any positions where the wildtype and mut 
+        sidechains have at least one atom further apart than the distance 
+        threshold.
+        """
+        from math import sqrt
+
+        for i in range(len(self.aligned_resis[0])):
+            wt_seq = self.aligned_seqs[0][i]
+            mut_seq = self.aligned_seqs[1][i]
+
+            if wt_seq != mut_seq: continue
+            if wt_seq in 'X-' or mut_seq in 'X-': continue
+
+            # I wanted to use `cmd.rms_cur()` to calculate this, but it refuses 
+            # to work on residues with different numbers, which I often have.
+
+            wt_xyzs = {}
+            mut_xyzs = {}
+            sele = '({}) and resi {} and chain {}'
+
+            cmd.iterate_state(1,
+                    sele.format(self.wildtype_obj, *self.aligned_resis[0][i]),
+                    'wt_xyzs[name] = x,y,z',
+                    space=locals(),
+            )
+            cmd.iterate_state(1,
+                    sele.format(self.mutant_obj, *self.aligned_resis[1][i]),
+                    'mut_xyzs[name] = x,y,z',
+                    space=locals(),
+            )
+
+            max_dist = 0
+            assert wt_xyzs.keys() == mut_xyzs.keys()
+
+            for k in wt_xyzs:
+                dist = sqrt(sum(
+                    (wt_xyzs[k][j] - mut_xyzs[k][j])**2
+                    for j in range(3)
+                ))
+                max_dist = max(dist, max_dist)
+
+            if max_dist > self.flip_dist_cutoff:
+                yield i
 
     def set_active_mutation(self, index):
         """
@@ -223,6 +287,14 @@ class WildtypeVsMutant (Wizard):
         self.show_polar_h = option
         self.redraw()
 
+    def set_mutation_mode(self, mode):
+        """
+        Change which residues are included in the mutation list (e.g. just 
+        mutations or mutations and rotamer flips).
+        """
+        self.mutation_mode = mode
+        self.update_mutation_list()
+
     def get_next_mutation(self):
         """
         Return the index of the next mutation.  The index is relative to the
@@ -244,17 +316,19 @@ class WildtypeVsMutant (Wizard):
         into the sequence alignment that defaults to the currently active
         mutation.  The returned name will be formatted like so:
 
-        Mutation:  D38E
-        Insertion: -38E
-        Deletion:  D38-
+        Mutation:    D38E
+        Insertion:   -38E
+        Deletion:    D38-
+        Unchanged:   D38
         """
         if muti is None:
             mutis = self.active_mutations
         else:
             mutis = [muti]
 
-        return_string = ''
+        names = []
         for i, muti in enumerate(mutis):
+
             # Figure out the one-letter residue names from the alignment.
 
             wildtype_res = self.aligned_seqs[0][muti]
@@ -269,16 +343,16 @@ class WildtypeVsMutant (Wizard):
             while resi is None:
                 resi, chain = self.aligned_resis[0][muti]; muti -= 1
 
-            if i + 1 >= len(mutis):
-                format_string = '{}{}{}'
+            if wildtype_res != mutant_res:
+                name = '{}{}{}'.format(wildtype_res, resi, mutant_res)
             else:
-                format_string = '{}{}{}, '
+                name = '{}{}'.format(wildtype_res, resi)
 
-            return_string += format_string.format(wildtype_res, resi, mutant_res)
+            names.append(name)
 
         # Return the concatenated name.
 
-        return return_string
+        return ', '.join(names)
 
     def get_panel(self):
         """
@@ -330,11 +404,13 @@ class WildtypeVsMutant (Wizard):
             [1, "Wildtype vs Mutant Wizard", ''],
             [2, "Show next mutation", 'cmd.get_wizard().show_next_mutation()'],
             [2, "Show all mutations", 'cmd.get_wizard().show_all_mutations()'],
+            [2, "Add (sele) positions", 'cmd.get_wizard().add_selected_positions()'],
             [3, "Wildtype highlight: {}".format(self.wildtype_hilite), 'wt_hilite'],
             [3, "Mutant highlight: {}".format(self.mutant_hilite), 'mut_hilite'],
             [3, "Neighbor radius: {0:.1f}A".format(self.neighbor_radius), 'radius'],
             [3, "Zoom padding: {0:.1f}A".format(self.zoom_padding), 'padding'],
             [3, "Polar hydrogens: {}".format('show' if self.show_polar_h else 'hide'), 'hydrogen'],
+            [3, "Include: {}".format(self.mutation_mode), 'mutation_mode'],
         ]
 
         # Make a button for each mutation.  The user can click on these buttons 
@@ -365,6 +441,7 @@ class WildtypeVsMutant (Wizard):
             'radius': [[2, 'Neighbor Radius', '']],
             'padding': [[2, 'Zoom Padding', '']],
             'hydrogen': [[2, 'Polar Hydrogens', '']],
+            'mutation_mode': [[2, 'Include', '']],
         }
 
         # Define the highlight color menu.
@@ -404,6 +481,10 @@ class WildtypeVsMutant (Wizard):
         menus['hydrogen'] += [[
             1, 'show' if toggled_option else 'hide',
             'cmd.get_wizard().set_show_polar_h({})'.format(toggled_option)]]
+
+        # Define the mutation mode menu.
+        menus['mutation_mode'] += [[1, 'mutations', 'cmd.get_wizard().set_mutation_mode("mutations")']]
+        menus['mutation_mode'] += [[1, 'muts+flips', 'cmd.get_wizard().set_mutation_mode("muts+flips")']]
 
         # Return the right menu.
         return menus[tag]
@@ -474,6 +555,28 @@ class WildtypeVsMutant (Wizard):
         Show all the mutations simultaneously.
         """
         self.active_mutations = self.mutations
+        self.redraw()
+
+    def add_selected_positions(self, selection='sele'):
+        """
+        Add any positions currently in the given selection to the list of 
+        mutations to show (even if those positions are not in fact mutations).
+        """
+        wt_resis = get_residues('({}) and (({}) or wt_env)'.format(selection, self.wildtype_obj))
+        mut_resis = get_residues('({}) and (({}) or mut_env)'.format(selection, self.mutant_obj))
+        
+        for resi in wt_resis:
+            print self.aligned_resis[0]
+            muti = self.aligned_resis[0].index(resi)
+            self.extra_positions.add(muti)
+
+        for resi in mut_resis:
+            print self.aligned_resis[1]
+            muti = self.aligned_resis[1].index(resi)
+            self.extra_positions.add(muti)
+
+        print self.extra_positions
+        self.update_mutation_list(False)
         self.redraw()
 
     def redraw(self):
@@ -576,6 +679,18 @@ def wt_vs_mut(mutant_obj=None, wildtype_obj=None, focus_sele=None):
     """
     wizard = WildtypeVsMutant(mutant_obj, wildtype_obj, focus_sele)
     cmd.set_wizard(wizard)
+
+def get_residues(selection):
+    """
+    Return a set of (residue number, chain id) tuples representing all the 
+    residues contained in the given selection.
+    """
+    residues = set()
+    int_from_str = int
+    cmd.iterate(selection, 'residues.add((int_from_str(resi), chain))', space=locals())
+    print selection
+    print residues
+    return residues
 
 def get_sequence(selection):
     """
