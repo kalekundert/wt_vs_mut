@@ -61,7 +61,7 @@ class WildtypeVsMutant (Wizard):
 
     def __init__(self, wildtype_obj='', mutant_obj='', focus_sele=''):
         self.mutations = []
-        self.active_mutations = []
+        self.active_mutations = set()
         self.aligned_seqs = '', ''
         self.aligned_resis = [], []
         self.extra_positions = set()
@@ -108,7 +108,7 @@ class WildtypeVsMutant (Wizard):
         self.active_prompt = ''
         self.update_mutation_list()
 
-    def update_mutation_list(self, show_next_mutation=True):
+    def update_mutation_list(self):
         """
         Find sequence differences between the wildtype and mutant structures to
         highlight.  Insertions and deletions are handled smoothly because the
@@ -180,6 +180,11 @@ class WildtypeVsMutant (Wizard):
                 if in_focus_sele(i)
         }
 
+        # If the user requested include sidechains that are packed very 
+        # differently in the list of mutations (i.e. "Include: muts+flips"), 
+        # find those positions and include them (if they are within the focus 
+        # selection).
+
         if self.mutation_mode == 'muts+flips':
             mutations |= {
                     i for i in self.find_flips()
@@ -192,12 +197,31 @@ class WildtypeVsMutant (Wizard):
         # selected by the user.  These indices can be used with both 
         # self.aligned_seqs and self.aligned_resis.
 
+        old_mutations = self.mutations
         self.mutations = sorted(mutations | self.extra_positions)
 
-        # Automatically zoom in on the first mutation.
+        # Make sure that all the residues in self.active_residues are still in 
+        # self.mutations.  If are are not, replace them with the next residue 
+        # that is still active. 
 
-        if show_next_mutation:
-            self.show_next_mutation()
+        old_active_mutations = self.active_mutations
+        self.active_mutations = set()
+
+        for muti in old_active_mutations:
+            if muti in self.mutations:
+                self.active_mutations.add(muti)
+            else:
+                for mutj in self.mutations:
+                    if mutj > muti:
+                        self.active_mutations.add(mutj)
+                        break
+
+        # If there aren't any active mutations, make the first one active.
+
+        if not self.active_mutations:
+            self.active_mutations = {self.mutations[0]}
+
+        self.redraw()
 
     def find_flips(self):
         """
@@ -219,7 +243,7 @@ class WildtypeVsMutant (Wizard):
 
             wt_xyzs = {}
             mut_xyzs = {}
-            sele = '({}) and resi {} and chain {}'
+            sele = '({}) and resi {} and chain {} and not hydro'
 
             cmd.iterate_state(1,
                     sele.format(self.wildtype_obj, *self.aligned_resis[0][i]),
@@ -232,9 +256,11 @@ class WildtypeVsMutant (Wizard):
                     space=locals(),
             )
 
-            max_dist = 0
+            # If we have two of the same residues, the heavy-atoms should have 
+            # the same names.
             assert wt_xyzs.keys() == mut_xyzs.keys()
 
+            max_dist = 0
             for k in wt_xyzs:
                 dist = sqrt(sum(
                     (wt_xyzs[k][j] - mut_xyzs[k][j])**2
@@ -249,7 +275,7 @@ class WildtypeVsMutant (Wizard):
         """
         Set the mutation being currently highlighted.
         """
-        self.active_mutations = [index]
+        self.active_mutations = {index}
         self.redraw()
 
     def set_neighbor_radius(self, radius):
@@ -305,8 +331,8 @@ class WildtypeVsMutant (Wizard):
             raise IndexError
 
         if len(self.active_mutations) == 1:
-            index = self.mutations.index(self.active_mutations[0]) + 1
-            return self.mutations[index]
+            i = self.mutations.index(next(iter(self.active_mutations)))
+            return self.mutations[i + 1]
         else:
             return self.mutations[0]
 
@@ -322,7 +348,7 @@ class WildtypeVsMutant (Wizard):
         Unchanged:   D38
         """
         if muti is None:
-            mutis = self.active_mutations
+            mutis = sorted(self.active_mutations)
         else:
             mutis = [muti]
 
@@ -554,7 +580,7 @@ class WildtypeVsMutant (Wizard):
         """
         Show all the mutations simultaneously.
         """
-        self.active_mutations = self.mutations
+        self.active_mutations = set(self.mutations)
         self.redraw()
 
     def add_selected_positions(self, selection='sele'):
@@ -576,7 +602,7 @@ class WildtypeVsMutant (Wizard):
             self.extra_positions.add(muti)
 
         print self.extra_positions
-        self.update_mutation_list(False)
+        self.update_mutation_list()
         self.redraw()
 
     def redraw(self):
