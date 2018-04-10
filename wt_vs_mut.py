@@ -218,7 +218,7 @@ class WildtypeVsMutant (Wizard):
 
         # If there aren't any active mutations, make the first one active.
 
-        if not self.active_mutations:
+        if not self.active_mutations and self.mutations:
             self.active_mutations = {self.mutations[0]}
 
         self.redraw()
@@ -409,20 +409,6 @@ class WildtypeVsMutant (Wizard):
                 [2, "Cancel", 'cmd.get_wizard().cleanup()'],
             ]
 
-        # If the user has provided wildtype and mutant objects, but no 
-        # mutations were found, show an error message.
-
-        if not self.mutations:
-            from textwrap import wrap
-            return [
-                [1, "Wildtype vs Mutant Wizard", ''],
-            ] + [
-                [1, '\\900' + x, '']
-                for x in wrap("No mutations found.  Do `{0}' and `{1}' have the same sequence?".format(self.wildtype_obj, self.mutant_obj), 26)
-            ] + [
-                [2, "Cancel", 'cmd.get_wizard().cleanup()'],
-            ]
-
         # Make the buttons and menus that control the basic actions and 
         # settings that don't depend on the specific system being studied.
 
@@ -449,6 +435,13 @@ class WildtypeVsMutant (Wizard):
             if muti in self.active_mutations:
                 name = '\\090' + name
             buttons += [[2, name, command.format(muti)]]
+
+        if not self.mutations:
+            from textwrap import wrap
+            buttons += [
+                [1, '\\900' + x, '']
+                for x in wrap("No mutations found.  Do `{0}' and `{1}' have the same sequence?".format(self.wildtype_obj, self.mutant_obj), 26)
+            ]
 
         # Make a quit button and return the buttons data structure.
 
@@ -592,16 +585,13 @@ class WildtypeVsMutant (Wizard):
         mut_resis = get_residues('({}) and (({}) or mut_env)'.format(selection, self.mutant_obj))
         
         for resi in wt_resis:
-            print self.aligned_resis[0]
             muti = self.aligned_resis[0].index(resi)
             self.extra_positions.add(muti)
 
         for resi in mut_resis:
-            print self.aligned_resis[1]
             muti = self.aligned_resis[1].index(resi)
             self.extra_positions.add(muti)
 
-        print self.extra_positions
         self.update_mutation_list()
         self.redraw()
 
@@ -714,8 +704,6 @@ def get_residues(selection):
     residues = set()
     int_from_str = int
     cmd.iterate(selection, 'residues.add((int_from_str(resi), chain))', space=locals())
-    print selection
-    print residues
     return residues
 
 def get_sequence(selection):
