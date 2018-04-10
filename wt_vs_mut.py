@@ -581,8 +581,16 @@ class WildtypeVsMutant (Wizard):
         Add any positions currently in the given selection to the list of 
         mutations to show (even if those positions are not in fact mutations).
         """
-        wt_resis = get_residues('({}) and (({}) or wt_env)'.format(selection, self.wildtype_obj))
-        mut_resis = get_residues('({}) and (({}) or mut_env)'.format(selection, self.mutant_obj))
+        wt_obj = self.wildtype_obj
+        mut_obj = self.mutant_obj
+
+        if 'wt_env' in cmd.get_names("selections"):
+            wt_obj = '({}) or wt_env'.format(wt_obj)
+        if 'mut_env' in cmd.get_names("selections"):
+            mut_obj = '({}) or mut_env'.format(mut_obj)
+
+        wt_resis = get_residues('({}) and ({})'.format(selection, wt_obj))
+        mut_resis = get_residues('({}) and ({})'.format(selection, mut_obj))
         
         for resi in wt_resis:
             muti = self.aligned_resis[0].index(resi)
