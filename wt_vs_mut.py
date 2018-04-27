@@ -584,9 +584,9 @@ class WildtypeVsMutant (Wizard):
         wt_obj = self.wildtype_obj
         mut_obj = self.mutant_obj
 
-        if 'wt_env' in cmd.get_names("selections"):
+        if 'wt_env' in cmd.get_names('objects'):
             wt_obj = '({}) or wt_env'.format(wt_obj)
-        if 'mut_env' in cmd.get_names("selections"):
+        if 'mut_env' in cmd.get_names('objects'):
             mut_obj = '({}) or mut_env'.format(mut_obj)
 
         wt_resis = get_residues('({}) and ({})'.format(selection, wt_obj))
