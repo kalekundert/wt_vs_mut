@@ -484,7 +484,7 @@ class WildtypeVsMutant (Wizard):
                 'cmd.get_wizard().set_mutant_hilite("{}")'.format(color[4:])]]
 
         # Define the neighbor radius menu.
-        for radius in range(11):
+        for radius in range(16):
             menus['radius'] += [[
                 1, '{0:0.1f}A'.format(radius),
                 'cmd.get_wizard().set_neighbor_radius({})'.format(radius)]]
