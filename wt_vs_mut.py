@@ -28,7 +28,6 @@ amino_acids = {
         'TRP': 'W',
         'TYR': 'Y',
 }
-
 blosum_62 = {
         ('A', 'A') :  4, ('R', 'A') : -1, ('N', 'A') : -2, ('D', 'A') : -2, ('C', 'A') :  0, ('Q', 'A') : -1, ('E', 'A') : -1, ('G', 'A') :  0, ('H', 'A') : -2, ('I', 'A') : -1, ('L', 'A') : -1, ('K', 'A') : -1, ('M', 'A') : -1, ('F', 'A') : -2, ('P', 'A') : -1, ('S', 'A') :  1, ('T', 'A') :  0, ('W', 'A') : -3, ('Y', 'A') : -2, ('V', 'A') :  0,
         ('A', 'R') : -1, ('R', 'R') :  5, ('N', 'R') :  0, ('D', 'R') : -2, ('C', 'R') : -3, ('Q', 'R') :  1, ('E', 'R') :  0, ('G', 'R') : -2, ('H', 'R') :  0, ('I', 'R') : -3, ('L', 'R') : -2, ('K', 'R') :  2, ('M', 'R') : -1, ('F', 'R') : -3, ('P', 'R') : -2, ('S', 'R') : -1, ('T', 'R') : -1, ('W', 'R') : -3, ('Y', 'R') : -2, ('V', 'R') : -3,
@@ -51,7 +50,6 @@ blosum_62 = {
         ('A', 'Y') : -2, ('R', 'Y') : -2, ('N', 'Y') : -2, ('D', 'Y') : -3, ('C', 'Y') : -2, ('Q', 'Y') : -1, ('E', 'Y') : -2, ('G', 'Y') : -3, ('H', 'Y') :  2, ('I', 'Y') : -1, ('L', 'Y') : -1, ('K', 'Y') : -2, ('M', 'Y') : -1, ('F', 'Y') :  3, ('P', 'Y') : -3, ('S', 'Y') : -2, ('T', 'Y') : -2, ('W', 'Y') :  2, ('Y', 'Y') :  7, ('V', 'Y') : -1,
         ('A', 'V') :  0, ('R', 'V') : -3, ('N', 'V') : -3, ('D', 'V') : -3, ('C', 'V') : -1, ('Q', 'V') : -2, ('E', 'V') : -2, ('G', 'V') : -3, ('H', 'V') : -3, ('I', 'V') :  3, ('L', 'V') :  1, ('K', 'V') : -2, ('M', 'V') :  1, ('F', 'V') : -1, ('P', 'V') : -2, ('S', 'V') : -2, ('T', 'V') :  0, ('W', 'V') : -3, ('Y', 'V') : -1, ('V', 'V') :  4,
 }
-
 
 class WildtypeVsMutant (Wizard):
     """
@@ -256,12 +254,15 @@ class WildtypeVsMutant (Wizard):
                     space=locals(),
             )
 
-            # If we have two of the same residues, the heavy-atoms should have 
-            # the same names.
-            assert wt_xyzs.keys() == mut_xyzs.keys()
+            # Even though the two residue are the same type, they might have 
+            # different sets of atoms.  Some ways this could happen: (i) some 
+            # atoms weren't resolved in one structure, (ii) Rosetta adds an 
+            # oxygen to the C-terminus (OXT).
+
+            keys = set(wt_xyzs.keys()) & set(mut_xyzs.keys())
 
             max_dist = 0
-            for k in wt_xyzs:
+            for k in keys:
                 dist = sqrt(sum(
                     (wt_xyzs[k][j] - mut_xyzs[k][j])**2
                     for j in range(3)
@@ -695,8 +696,6 @@ class WildtypeVsMutant (Wizard):
         cmd.set_view(self.original_view)
         cmd.set_wizard()
 
-
-
 def wt_vs_mut(mutant_obj=None, wildtype_obj=None, focus_sele=None):
     """
     Provide a convenient way to launch the wizard from the command-line.
@@ -821,7 +820,6 @@ def get_score_from_matrix(pos1, pos2, score_matrix=blosum_62):
         return score_matrix[pos1, pos2]
     except KeyError:
         return 5 if pos1 == pos2 else -4
-
 
 ## Add "wt_vs_mut" as pymol command
 cmd.extend('wt_vs_mut', wt_vs_mut)
